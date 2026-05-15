@@ -1,0 +1,61 @@
+from typing import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+
+---------------------------------------------------
+from langchain_openai import ChatOpenAI
+import os
+from dotenv import load_dotenv
+# Load environment variables (API Key)
+load_dotenv()
+model=ChatOpenAI(api_key=os.getenv('KEY'),
+                 base_url="https://api.deepseek.com/v1",
+    model="deepseek-chat")
+--------------------------------------------------------
+
+# Define the State
+class BlogState(TypedDict):
+    title: str
+    outline: str
+    content: str
+
+
+def create_outline(state: BlogState):
+    title = state['title']
+    prompt = f"Generate a detailed outline for a blog on the topic: {title}"
+    
+    response = model.invoke(prompt)
+    state['outline'] = response.content
+    return state
+
+
+def create_blog(state: BlogState):
+    title = state['title']
+    outline = state['outline']
+    prompt = f"Write a detailed blog on the title: {title} \n\n Using the following outline: \n {outline}"
+    
+    response = model.invoke(prompt)
+    state['content'] = response.content
+    return state
+
+# Initialize the Graph
+builder = StateGraph(BlogState)
+
+# Add Nodes
+builder.add_node("create_outline", create_outline)
+builder.add_node("create_blog", create_blog)
+
+# Add Edges (Defining the sequence)
+builder.add_edge(START, "create_outline")
+builder.add_edge("create_outline", "create_blog")
+builder.add_edge("create_blog", END)
+
+# Compile the Workflow
+workflow = builder.compile()
+
+initial_state = {"title": "Rise of AI in India"}
+final_state = workflow.invoke(initial_state)
+
+print(final_state['outline'])
+
+print(final_state['content'])
